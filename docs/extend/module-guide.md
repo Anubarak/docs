@@ -96,6 +96,60 @@ class Module extends \yii\base\Module
 
 Replace `foo` with your module’s actual namespace.
 
+## Rendering Module Templates and Translations
+
+Unlike plugins modules work with Yii2 directly thus they don't have the ability to provide their own template path nor their translation files by default. If the module should be able to render its own templates like plugins they need to include their template routes to the `craft\web\View` component using the `View::EVENT_REGISTER_CP_TEMPLATE_ROOTS` event (see [RegisterTemplateRootsEvent](https://docs.craftcms.com/api/v3/craft-web-view.html#event-register-cp-template-roots)
+
+```php
+<?php
+namespace foo;
+
+use craft\events\RegisterTemplateRootsEvent;
+use craft\web\View;
+
+class Module extends \yii\base\Module
+{
+    public function __construct($id, $parent = null, array $config = [])
+    {
+        // set an alias to the modules base path
+        Craft::setAlias('@foo', $this->getBasePath());
+
+        // inklude the "templates" directory 
+        Event::on(
+            View::class,
+            View::EVENT_REGISTER_CP_TEMPLATE_ROOTS,
+            function(RegisterTemplateRootsEvent $e) {
+                // define the directory of the templates folder
+                if (is_dir($baseDir = $this->getBasePath() . DIRECTORY_SEPARATOR . 'templates')) {
+                    // Craft is now able to search for templates 
+                    $e->roots[$this->id] = $baseDir;
+                }
+            }
+        );
+
+        // To include a custom translation category 
+        $i18n = Craft::$app->getI18n();
+        /** @noinspection UnSafeIsSetOverArrayInspection */
+        if (!isset($i18n->translations[$id]) && !isset($i18n->translations[$id . '*'])) {
+            $i18n->translations[$id] = [
+                'class'            => PhpMessageSource::class,
+                'sourceLanguage'   => 'en-US',
+                'basePath'         => '@foo/translations',
+                'forceTranslation' => true,
+                'allowOverrides'   => true,
+            ];
+        }
+
+        static::setInstance($this);
+        
+        parent::__construct($id, $parent, $config);
+    }
+}
+
+```
+
+You are now able to translate messages via `{{ 'Hello World'|t('foo') }}` or rendering templates `Craft::$app->getView()->renderTemplate('foo/path/to/template', []);`
+
 ## Further Reading
 
 To learn more about modules, see the [Yii documentation](http://www.yiiframework.com/doc-2.0/guide-structure-modules.html).
