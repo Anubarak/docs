@@ -96,6 +96,67 @@ class Module extends \yii\base\Module
 
 Replace `foo` with your module’s actual namespace.
 
+## Rendering Templates and Translation Files via module
+
+By default modules are not able to render templates nor do they provide their own translation files. In order to gain those abilities you need to implement them by either overwrite the `contructor` or using the module’s `init` function. Here is an example 
+
+```PHP
+public function __construct($id, $parent = null, array $config = [])
+{
+    // include a custom alias - this is optional
+    Craft::setAlias('@my-module', $this->getBasePath());
+    
+    // Translation category
+    $i18n = Craft::$app->getI18n();
+    /** @noinspection UnSafeIsSetOverArrayInspection */
+    if (!isset($i18n->translations[$id]) && !isset($i18n->translations[$id . '*'])) {
+        $i18n->translations[$id] = [
+            'class'            => PhpMessageSource::class,
+            'sourceLanguage'   => 'en-US',
+            // insert the base path of your prefered translations folder
+            'basePath'         => '@my-module/translations',
+            'forceTranslation' => true,
+            'allowOverrides'   => true,
+        ];
+    }
+
+    // include the template roots for the module's '/templates' folder
+    // you can as well use every other folder name
+    Event::on(
+        View::class,
+        View::EVENT_REGISTER_CP_TEMPLATE_ROOTS,
+        function(RegisterTemplateRootsEvent $e) {
+            if (is_dir($baseDir = $this->getBasePath() . DIRECTORY_SEPARATOR . 'templates')) {
+                $e->roots[$this->id] = $baseDir;
+            }
+        }
+    );
+
+    // Set this as the global instance of this module class
+    static::setInstance($this);
+
+    parent::__construct($id, $parent, $config);
+}
+```
+
+To render those templates do the same like you are used to with [plugins](https://docs.craftcms.com/v3/extend/updating-plugins.html#rendering-templates) 
+
+```PHP
+$html = Craft::$app->getView()->renderTemplate('module-id/path/to/template', $variables);
+// in the current example of the module with id 'foo'
+$html = Craft::$app->getView()->renderTemplate('foo/path/to/template', $variables);
+```
+
+Translating files is the same as well<br>
+**Twig**
+```Twig
+{{ 'Hello World!'('foo') }}
+```
+**PHP**
+```PHP
+ Craft::t('foo' 'Hello World!');
+```
+
 ## Further Reading
 
 To learn more about modules, see the [Yii documentation](http://www.yiiframework.com/doc-2.0/guide-structure-modules.html).
